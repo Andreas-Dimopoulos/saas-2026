@@ -62,9 +62,34 @@ with `httpie`.
 
 Persistence: EF Core with SQLite.
 
-Tests live in `tests/TodoApi.Tests`, which project-references `src/TodoApi` directly
-(no HTTP round-trip needed for unit tests; use `WebApplicationFactory` if/when
-integration tests are added — discuss before introducing that).
+Tests live in `tests/TodoApi.Tests`, which project-references `src/TodoApi` and runs
+real HTTP requests against it via a `WebApplicationFactory<Program>`-based fixture
+(`TodoApiFactory`), backed by an isolated SQLite in-memory connection per factory
+instance (not the EF Core InMemory provider — that doesn't enforce FK/relational
+constraints).
+
+### Required local setup: JWT signing key
+
+The JWT signing key lives in **user-secrets**, never in `appsettings.json` or the repo.
+`src/TodoApi` won't start (and `dotnet test` will fail at host startup) without it.
+One-time setup from `src/TodoApi`:
+
+```
+dotnet user-secrets set "Jwt:SigningKey" "<base64-encoded 256-bit key>"
+```
+
+Generate a key (PowerShell):
+
+```powershell
+$bytes = New-Object byte[] 32
+[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+[System.Convert]::ToBase64String($bytes)
+```
+
+This is per-developer-machine by design (stored outside the repo, under
+`%APPDATA%\Microsoft\UserSecrets\<UserSecretsId>\secrets.json` on Windows) — a fresh
+clone or CI environment needs this set (or the equivalent `Jwt__SigningKey` env var)
+before the app or its tests will run.
 
 ## Working conventions (how to collaborate on this repo)
 
@@ -102,4 +127,12 @@ integration tests are added — discuss before introducing that).
 - [x] Solution + three projects created and wired (`dotnet build` passes clean)
 - [x] `Microsoft.OpenApi` pinned to 2.7.5 in TodoApi (template default 2.0.0 had a
       known high-severity advisory, GHSA-v5pm-xwqc-g5wc / CVE-2026-49451)
-- [ ] Everything else — not started yet
+- [x] `Todo`/`TodoItem` entities, cascade delete, all five `/todos` endpoints
+- [x] All four `/todos/:id/items/:iid` endpoints, scoped to their parent todo
+- [x] `POST /signup` — `User` entity, `PasswordHasher<User>` (no extra NuGet package
+      needed — ships in the `Microsoft.AspNetCore.App` shared framework already)
+- [x] `POST /auth/login` — issues a JWT; `GET /auth/logout` — real jti-denylist
+      revocation, lazy purge-on-logout keeps the table bounded
+- [ ] `[Authorize]` on TodosController/ItemsController + per-user query scoping
+      (removing client-supplied `CreatedBy`) — next
+- [ ] Swagger/OpenAPI polish, httpie verification pass, Portal (Theme 1) — not started
