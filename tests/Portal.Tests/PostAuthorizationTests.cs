@@ -23,7 +23,7 @@ public class PostAuthorizationTests
                 ["__RequestVerificationToken"] = token,
                 ["Title"] = "Hijacked",
                 ["Body"] = "Hijacked body",
-                ["Category"] = "News"
+                ["Category"] = nameof(PostCategory.General)
             }));
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -60,7 +60,7 @@ public class PostAuthorizationTests
         {
             Title = title,
             Body = "Body",
-            Category = "News",
+            Category = PostCategory.General,
             AuthorId = author.Id,
             CreatedAt = now,
             UpdatedAt = now

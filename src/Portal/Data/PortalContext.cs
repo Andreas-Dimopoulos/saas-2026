@@ -17,5 +17,9 @@ public class PortalContext(DbContextOptions<PortalContext> options) : IdentityDb
             .WithMany()
             .HasForeignKey(post => post.AuthorId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Post>()
+            .Property(post => post.Category)
+            .HasConversion<string>();
     }
 }

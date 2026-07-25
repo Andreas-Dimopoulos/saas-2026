@@ -11,14 +11,29 @@ namespace Portal.Controllers;
 [Authorize]
 public class PostsController(PortalContext context, UserManager<PortalUser> userManager) : Controller
 {
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(string? search, PostCategory? category)
     {
-        var posts = await context.Posts
-            .Include(post => post.Author)
-            .OrderByDescending(post => post.CreatedAt)
-            .ToListAsync();
+        var query = context.Posts.Include(post => post.Author).AsQueryable();
 
-        return View(posts);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var pattern = $"%{search}%";
+            query = query.Where(post => EF.Functions.Like(post.Title, pattern) || EF.Functions.Like(post.Body, pattern));
+        }
+
+        if (category is not null)
+        {
+            query = query.Where(post => post.Category == category);
+        }
+
+        var posts = await query.OrderByDescending(post => post.CreatedAt).ToListAsync();
+
+        return View(new PostsIndexViewModel
+        {
+            Posts = posts,
+            Search = search,
+            Category = category
+        });
     }
 
     public async Task<IActionResult> Details(int id)
