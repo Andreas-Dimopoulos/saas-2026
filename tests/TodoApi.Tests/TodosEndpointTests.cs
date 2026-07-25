@@ -60,6 +60,18 @@ public class TodosEndpointTests
     }
 
     [Fact]
+    public async Task GetTodoById_ReturnsNotFound_WhenMissing()
+    {
+        using var factory = new TodoApiFactory();
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/todos/999");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
     public async Task PutTodoById_ReturnsOkWithUpdatedTodo()
     {
         using var factory = new TodoApiFactory();
