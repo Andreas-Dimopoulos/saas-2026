@@ -9,10 +9,14 @@ namespace TodoApi.Tests;
 
 public sealed class TodoApiFactory : WebApplicationFactory<Program>
 {
+    private const string TestJwtSigningKey = "2riaNiCrmrhUgZZrOrjWaD+3LHcB9Xe8iDhMdzPUhXQ=";
+
     public SqliteConnection Connection { get; } = new("Data Source=:memory:");
 
     public TodoApiFactory()
     {
+        // ConfigureWebHost's config runs too late for Program.cs's eager Jwt:SigningKey read; env vars don't.
+        Environment.SetEnvironmentVariable("Jwt__SigningKey", TestJwtSigningKey);
         Connection.Open();
     }
 

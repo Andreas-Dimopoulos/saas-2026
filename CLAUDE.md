@@ -66,13 +66,16 @@ Tests live in `tests/TodoApi.Tests`, which project-references `src/TodoApi` and 
 real HTTP requests against it via a `WebApplicationFactory<Program>`-based fixture
 (`TodoApiFactory`), backed by an isolated SQLite in-memory connection per factory
 instance (not the EF Core InMemory provider — that doesn't enforce FK/relational
-constraints).
+constraints). `TodoApiFactory` also sets its own `Jwt__SigningKey` environment variable
+(a fixed, test-only key, distinct from any developer's real secret) before the host is
+created, so `dotnet test` is fully self-contained and passes on a clean clone with no
+setup — verified by clearing user-secrets entirely and running the full suite.
 
-### Required local setup: JWT signing key
+### Required local setup for running the app: JWT signing key
 
 The JWT signing key lives in **user-secrets**, never in `appsettings.json` or the repo.
-`src/TodoApi` won't start (and `dotnet test` will fail at host startup) without it.
-One-time setup from `src/TodoApi`:
+`src/TodoApi` (via `dotnet run`) won't start without it — tests don't need this, only
+running the app for real does. One-time setup from `src/TodoApi`:
 
 ```
 dotnet user-secrets set "Jwt:SigningKey" "<base64-encoded 256-bit key>"
@@ -87,9 +90,7 @@ $bytes = New-Object byte[] 32
 ```
 
 This is per-developer-machine by design (stored outside the repo, under
-`%APPDATA%\Microsoft\UserSecrets\<UserSecretsId>\secrets.json` on Windows) — a fresh
-clone or CI environment needs this set (or the equivalent `Jwt__SigningKey` env var)
-before the app or its tests will run.
+`%APPDATA%\Microsoft\UserSecrets\<UserSecretsId>\secrets.json` on Windows).
 
 ## Working conventions (how to collaborate on this repo)
 
