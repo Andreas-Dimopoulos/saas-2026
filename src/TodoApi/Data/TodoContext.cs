@@ -7,6 +7,7 @@ public class TodoContext(DbContextOptions<TodoContext> options) : DbContext(opti
 {
     public DbSet<Todo> Todos => Set<Todo>();
     public DbSet<TodoItem> Items => Set<TodoItem>();
+    public DbSet<User> Users => Set<User>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -15,5 +16,9 @@ public class TodoContext(DbContextOptions<TodoContext> options) : DbContext(opti
             .WithOne(item => item.Todo)
             .HasForeignKey(item => item.TodoId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<User>()
+            .HasIndex(user => user.Email)
+            .IsUnique();
     }
 }

@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using TodoApi.Data;
+using TodoApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,6 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddDbContext<TodoContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("TodoContext")));
+builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
