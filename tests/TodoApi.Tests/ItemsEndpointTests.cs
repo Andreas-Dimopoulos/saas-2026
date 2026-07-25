@@ -65,6 +65,170 @@ public class ItemsEndpointTests
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }
 
+    [Fact]
+    public async Task PostItem_ReturnsCreatedWithLocationAndBody()
+    {
+        using var factory = new TodoApiFactory();
+        var todoId = await SeedTodoAsync(factory, "Groceries");
+        var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync($"/todos/{todoId}/items", new { name = "Milk" });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.NotNull(response.Headers.Location);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(body.GetProperty("id").GetInt32() > 0);
+        Assert.Equal("Milk", body.GetProperty("name").GetString());
+        Assert.False(body.GetProperty("done").GetBoolean());
+    }
+
+    [Fact]
+    public async Task PostItem_ReturnsNotFound_WhenTodoMissing()
+    {
+        using var factory = new TodoApiFactory();
+        var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/todos/999/items", new { name = "Milk" });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task PostItem_ReturnsBadRequestProblemDetails_WhenNameMissing()
+    {
+        using var factory = new TodoApiFactory();
+        var todoId = await SeedTodoAsync(factory, "Groceries");
+        var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync($"/todos/{todoId}/items", new { });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task PutItem_ReturnsOkWithUpdatedItem()
+    {
+        using var factory = new TodoApiFactory();
+        var (todoId, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk");
+        var client = factory.CreateClient();
+
+        var response = await client.PutAsJsonAsync($"/todos/{todoId}/items/{itemId}", new { name = "Oat milk", done = true });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(itemId, body.GetProperty("id").GetInt32());
+        Assert.Equal("Oat milk", body.GetProperty("name").GetString());
+        Assert.True(body.GetProperty("done").GetBoolean());
+    }
+
+    [Fact]
+    public async Task PutItem_ReturnsNotFound_WhenTodoMissing()
+    {
+        using var factory = new TodoApiFactory();
+        var (_, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk");
+        var client = factory.CreateClient();
+
+        var response = await client.PutAsJsonAsync($"/todos/999/items/{itemId}", new { name = "Oat milk", done = true });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task PutItem_ReturnsNotFound_WhenItemBelongsToDifferentTodo()
+    {
+        using var factory = new TodoApiFactory();
+        var (_, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk");
+        var otherTodoId = await SeedTodoAsync(factory, "Work");
+        var client = factory.CreateClient();
+
+        var response = await client.PutAsJsonAsync($"/todos/{otherTodoId}/items/{itemId}", new { name = "Oat milk", done = true });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task PutItem_ReturnsNotFound_WhenItemMissing()
+    {
+        using var factory = new TodoApiFactory();
+        var todoId = await SeedTodoAsync(factory, "Groceries");
+        var client = factory.CreateClient();
+
+        var response = await client.PutAsJsonAsync($"/todos/{todoId}/items/999", new { name = "Oat milk", done = true });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task PutItem_ReturnsBadRequestProblemDetails_WhenNameMissing()
+    {
+        using var factory = new TodoApiFactory();
+        var (todoId, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk");
+        var client = factory.CreateClient();
+
+        var response = await client.PutAsJsonAsync($"/todos/{todoId}/items/{itemId}", new { done = true });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task DeleteItem_ReturnsNoContent()
+    {
+        using var factory = new TodoApiFactory();
+        var (todoId, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk");
+        var client = factory.CreateClient();
+
+        var response = await client.DeleteAsync($"/todos/{todoId}/items/{itemId}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteItem_ReturnsNotFound_WhenTodoMissing()
+    {
+        using var factory = new TodoApiFactory();
+        var (_, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk");
+        var client = factory.CreateClient();
+
+        var response = await client.DeleteAsync($"/todos/999/items/{itemId}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task DeleteItem_ReturnsNotFound_WhenItemBelongsToDifferentTodo()
+    {
+        using var factory = new TodoApiFactory();
+        var (_, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk");
+        var otherTodoId = await SeedTodoAsync(factory, "Work");
+        var client = factory.CreateClient();
+
+        var response = await client.DeleteAsync($"/todos/{otherTodoId}/items/{itemId}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task DeleteItem_ReturnsNotFound_WhenItemMissing()
+    {
+        using var factory = new TodoApiFactory();
+        var todoId = await SeedTodoAsync(factory, "Groceries");
+        var client = factory.CreateClient();
+
+        var response = await client.DeleteAsync($"/todos/{todoId}/items/999");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
     private static async Task<int> SeedTodoAsync(TodoApiFactory factory, string title)
     {
         using var scope = factory.Services.CreateScope();
