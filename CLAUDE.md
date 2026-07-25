@@ -20,7 +20,7 @@ saas-2026/
 │   └── TodoApi/          # Theme 2 — ASP.NET Core Web API (controller-based)
 ├── tests/
 │   └── TodoApi.Tests/    # xUnit, project-references src/TodoApi
-└── docs/                 # not yet created
+└── docs/                 # openapi.json export + httpie-verification.md transcript
 ```
 
 Target framework for all projects: `net10.0`.
@@ -136,4 +136,9 @@ This is per-developer-machine by design (stored outside the repo, under
       revocation, lazy purge-on-logout keeps the table bounded
 - [x] `[Authorize]` on TodosController and ItemsController; every query scoped to
       the authenticated user's email claim; `CreatedBy` no longer client-supplied
-- [ ] Swagger/OpenAPI polish, httpie verification pass, Portal (Theme 1) — not started
+- [x] Swagger UI (`/swagger/index.html`, dev only) with a JWT bearer security scheme
+      applied only to `[Authorize]`-protected operations; XML doc comments +
+      `[ProducesResponseType]` on every controller action, including 409 on signup
+- [x] `docs/openapi.json` export + `docs/httpie-verification.md` — every endpoint
+      exercised for real against a running instance, including the revoked-token 401
+- [ ] Portal (Theme 1) — not started
