@@ -10,12 +10,15 @@ namespace TodoApi.Tests;
 
 public class ItemsEndpointTests
 {
+    private const string OwnerEmail = "alice@example.com";
+    private const string OtherEmail = "bob@example.com";
+
     [Fact]
     public async Task GetItem_ReturnsOkWithMatchingItem()
     {
         using var factory = new TodoApiFactory();
-        var (todoId, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk");
-        var client = factory.CreateClient();
+        var (todoId, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk", OwnerEmail);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
 
         var response = await client.GetAsync($"/todos/{todoId}/items/{itemId}");
 
@@ -27,12 +30,37 @@ public class ItemsEndpointTests
     }
 
     [Fact]
+    public async Task GetItem_ReturnsUnauthorized_WithoutToken()
+    {
+        using var factory = new TodoApiFactory();
+        var (todoId, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk", OwnerEmail);
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync($"/todos/{todoId}/items/{itemId}");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
     public async Task GetItem_ReturnsNotFound_WhenTodoMissing()
     {
         using var factory = new TodoApiFactory();
-        var client = factory.CreateClient();
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
 
         var response = await client.GetAsync("/todos/999/items/1");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task GetItem_ReturnsNotFound_WhenTodoBelongsToDifferentUser()
+    {
+        using var factory = new TodoApiFactory();
+        var (todoId, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk", OtherEmail);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
+
+        var response = await client.GetAsync($"/todos/{todoId}/items/{itemId}");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -42,9 +70,9 @@ public class ItemsEndpointTests
     public async Task GetItem_ReturnsNotFound_WhenItemBelongsToDifferentTodo()
     {
         using var factory = new TodoApiFactory();
-        var (_, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk");
-        var otherTodoId = await SeedTodoAsync(factory, "Work");
-        var client = factory.CreateClient();
+        var (_, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk", OwnerEmail);
+        var otherTodoId = await SeedTodoAsync(factory, "Work", OwnerEmail);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
 
         var response = await client.GetAsync($"/todos/{otherTodoId}/items/{itemId}");
 
@@ -56,8 +84,8 @@ public class ItemsEndpointTests
     public async Task GetItem_ReturnsNotFound_WhenItemMissing()
     {
         using var factory = new TodoApiFactory();
-        var todoId = await SeedTodoAsync(factory, "Groceries");
-        var client = factory.CreateClient();
+        var todoId = await SeedTodoAsync(factory, "Groceries", OwnerEmail);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
 
         var response = await client.GetAsync($"/todos/{todoId}/items/999");
 
@@ -69,8 +97,8 @@ public class ItemsEndpointTests
     public async Task PostItem_ReturnsCreatedWithLocationAndBody()
     {
         using var factory = new TodoApiFactory();
-        var todoId = await SeedTodoAsync(factory, "Groceries");
-        var client = factory.CreateClient();
+        var todoId = await SeedTodoAsync(factory, "Groceries", OwnerEmail);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
 
         var response = await client.PostAsJsonAsync($"/todos/{todoId}/items", new { name = "Milk" });
 
@@ -87,9 +115,22 @@ public class ItemsEndpointTests
     public async Task PostItem_ReturnsNotFound_WhenTodoMissing()
     {
         using var factory = new TodoApiFactory();
-        var client = factory.CreateClient();
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
 
         var response = await client.PostAsJsonAsync("/todos/999/items", new { name = "Milk" });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task PostItem_ReturnsNotFound_WhenTodoBelongsToDifferentUser()
+    {
+        using var factory = new TodoApiFactory();
+        var todoId = await SeedTodoAsync(factory, "Groceries", OtherEmail);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
+
+        var response = await client.PostAsJsonAsync($"/todos/{todoId}/items", new { name = "Milk" });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -99,8 +140,8 @@ public class ItemsEndpointTests
     public async Task PostItem_ReturnsBadRequestProblemDetails_WhenNameMissing()
     {
         using var factory = new TodoApiFactory();
-        var todoId = await SeedTodoAsync(factory, "Groceries");
-        var client = factory.CreateClient();
+        var todoId = await SeedTodoAsync(factory, "Groceries", OwnerEmail);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
 
         var response = await client.PostAsJsonAsync($"/todos/{todoId}/items", new { });
 
@@ -112,8 +153,8 @@ public class ItemsEndpointTests
     public async Task PutItem_ReturnsOkWithUpdatedItem()
     {
         using var factory = new TodoApiFactory();
-        var (todoId, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk");
-        var client = factory.CreateClient();
+        var (todoId, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk", OwnerEmail);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
 
         var response = await client.PutAsJsonAsync($"/todos/{todoId}/items/{itemId}", new { name = "Oat milk", done = true });
 
@@ -128,10 +169,23 @@ public class ItemsEndpointTests
     public async Task PutItem_ReturnsNotFound_WhenTodoMissing()
     {
         using var factory = new TodoApiFactory();
-        var (_, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk");
-        var client = factory.CreateClient();
+        var (_, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk", OwnerEmail);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
 
         var response = await client.PutAsJsonAsync($"/todos/999/items/{itemId}", new { name = "Oat milk", done = true });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task PutItem_ReturnsNotFound_WhenTodoBelongsToDifferentUser()
+    {
+        using var factory = new TodoApiFactory();
+        var (todoId, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk", OtherEmail);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
+
+        var response = await client.PutAsJsonAsync($"/todos/{todoId}/items/{itemId}", new { name = "Hijacked", done = true });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -141,9 +195,9 @@ public class ItemsEndpointTests
     public async Task PutItem_ReturnsNotFound_WhenItemBelongsToDifferentTodo()
     {
         using var factory = new TodoApiFactory();
-        var (_, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk");
-        var otherTodoId = await SeedTodoAsync(factory, "Work");
-        var client = factory.CreateClient();
+        var (_, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk", OwnerEmail);
+        var otherTodoId = await SeedTodoAsync(factory, "Work", OwnerEmail);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
 
         var response = await client.PutAsJsonAsync($"/todos/{otherTodoId}/items/{itemId}", new { name = "Oat milk", done = true });
 
@@ -155,8 +209,8 @@ public class ItemsEndpointTests
     public async Task PutItem_ReturnsNotFound_WhenItemMissing()
     {
         using var factory = new TodoApiFactory();
-        var todoId = await SeedTodoAsync(factory, "Groceries");
-        var client = factory.CreateClient();
+        var todoId = await SeedTodoAsync(factory, "Groceries", OwnerEmail);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
 
         var response = await client.PutAsJsonAsync($"/todos/{todoId}/items/999", new { name = "Oat milk", done = true });
 
@@ -168,8 +222,8 @@ public class ItemsEndpointTests
     public async Task PutItem_ReturnsBadRequestProblemDetails_WhenNameMissing()
     {
         using var factory = new TodoApiFactory();
-        var (todoId, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk");
-        var client = factory.CreateClient();
+        var (todoId, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk", OwnerEmail);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
 
         var response = await client.PutAsJsonAsync($"/todos/{todoId}/items/{itemId}", new { done = true });
 
@@ -181,8 +235,8 @@ public class ItemsEndpointTests
     public async Task DeleteItem_ReturnsNoContent()
     {
         using var factory = new TodoApiFactory();
-        var (todoId, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk");
-        var client = factory.CreateClient();
+        var (todoId, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk", OwnerEmail);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
 
         var response = await client.DeleteAsync($"/todos/{todoId}/items/{itemId}");
 
@@ -193,10 +247,23 @@ public class ItemsEndpointTests
     public async Task DeleteItem_ReturnsNotFound_WhenTodoMissing()
     {
         using var factory = new TodoApiFactory();
-        var (_, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk");
-        var client = factory.CreateClient();
+        var (_, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk", OwnerEmail);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
 
         var response = await client.DeleteAsync($"/todos/999/items/{itemId}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task DeleteItem_ReturnsNotFound_WhenTodoBelongsToDifferentUser()
+    {
+        using var factory = new TodoApiFactory();
+        var (todoId, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk", OtherEmail);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
+
+        var response = await client.DeleteAsync($"/todos/{todoId}/items/{itemId}");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -206,9 +273,9 @@ public class ItemsEndpointTests
     public async Task DeleteItem_ReturnsNotFound_WhenItemBelongsToDifferentTodo()
     {
         using var factory = new TodoApiFactory();
-        var (_, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk");
-        var otherTodoId = await SeedTodoAsync(factory, "Work");
-        var client = factory.CreateClient();
+        var (_, itemId) = await SeedTodoWithItemAsync(factory, "Groceries", "Milk", OwnerEmail);
+        var otherTodoId = await SeedTodoAsync(factory, "Work", OwnerEmail);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
 
         var response = await client.DeleteAsync($"/todos/{otherTodoId}/items/{itemId}");
 
@@ -220,8 +287,8 @@ public class ItemsEndpointTests
     public async Task DeleteItem_ReturnsNotFound_WhenItemMissing()
     {
         using var factory = new TodoApiFactory();
-        var todoId = await SeedTodoAsync(factory, "Groceries");
-        var client = factory.CreateClient();
+        var todoId = await SeedTodoAsync(factory, "Groceries", OwnerEmail);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
 
         var response = await client.DeleteAsync($"/todos/{todoId}/items/999");
 
@@ -229,18 +296,18 @@ public class ItemsEndpointTests
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }
 
-    private static async Task<int> SeedTodoAsync(TodoApiFactory factory, string title)
+    private static async Task<int> SeedTodoAsync(TodoApiFactory factory, string title, string createdBy)
     {
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<TodoContext>();
         var now = DateTime.UtcNow;
-        var todo = new Todo { Title = title, CreatedBy = "alice", CreatedAt = now, UpdatedAt = now };
+        var todo = new Todo { Title = title, CreatedBy = createdBy, CreatedAt = now, UpdatedAt = now };
         context.Todos.Add(todo);
         await context.SaveChangesAsync();
         return todo.Id;
     }
 
-    private static async Task<(int TodoId, int ItemId)> SeedTodoWithItemAsync(TodoApiFactory factory, string todoTitle, string itemName)
+    private static async Task<(int TodoId, int ItemId)> SeedTodoWithItemAsync(TodoApiFactory factory, string todoTitle, string itemName, string createdBy)
     {
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<TodoContext>();
@@ -248,7 +315,7 @@ public class ItemsEndpointTests
         var todo = new Todo
         {
             Title = todoTitle,
-            CreatedBy = "alice",
+            CreatedBy = createdBy,
             CreatedAt = now,
             UpdatedAt = now,
             Items = [new TodoItem { Name = itemName, CreatedAt = now, UpdatedAt = now }]

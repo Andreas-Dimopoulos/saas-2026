@@ -1,13 +1,16 @@
 using System.Linq.Expressions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TodoApi.Data;
 using TodoApi.Dtos;
+using TodoApi.Extensions;
 using TodoApi.Models;
 
 namespace TodoApi.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("todos/{todoId:int}/items")]
 public class ItemsController(TodoContext context) : ControllerBase
 {
@@ -17,7 +20,8 @@ public class ItemsController(TodoContext context) : ControllerBase
     [HttpGet("{itemId:int}")]
     public async Task<ActionResult<TodoItemResponse>> GetItem(int todoId, int itemId)
     {
-        if (!await context.Todos.AnyAsync(t => t.Id == todoId))
+        var email = User.GetEmail();
+        if (!await context.Todos.AnyAsync(t => t.Id == todoId && t.CreatedBy == email))
         {
             return NotFound();
         }
@@ -38,7 +42,8 @@ public class ItemsController(TodoContext context) : ControllerBase
     [HttpPost]
     public async Task<ActionResult<TodoItemResponse>> CreateItem(int todoId, CreateTodoItemRequest request)
     {
-        if (!await context.Todos.AnyAsync(t => t.Id == todoId))
+        var email = User.GetEmail();
+        if (!await context.Todos.AnyAsync(t => t.Id == todoId && t.CreatedBy == email))
         {
             return NotFound();
         }
@@ -63,7 +68,8 @@ public class ItemsController(TodoContext context) : ControllerBase
     [HttpPut("{itemId:int}")]
     public async Task<ActionResult<TodoItemResponse>> UpdateItem(int todoId, int itemId, UpdateTodoItemRequest request)
     {
-        if (!await context.Todos.AnyAsync(t => t.Id == todoId))
+        var email = User.GetEmail();
+        if (!await context.Todos.AnyAsync(t => t.Id == todoId && t.CreatedBy == email))
         {
             return NotFound();
         }
@@ -86,7 +92,8 @@ public class ItemsController(TodoContext context) : ControllerBase
     [HttpDelete("{itemId:int}")]
     public async Task<IActionResult> DeleteItem(int todoId, int itemId)
     {
-        if (!await context.Todos.AnyAsync(t => t.Id == todoId))
+        var email = User.GetEmail();
+        if (!await context.Todos.AnyAsync(t => t.Id == todoId && t.CreatedBy == email))
         {
             return NotFound();
         }

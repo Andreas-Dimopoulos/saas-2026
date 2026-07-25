@@ -133,6 +133,6 @@ before the app or its tests will run.
       needed — ships in the `Microsoft.AspNetCore.App` shared framework already)
 - [x] `POST /auth/login` — issues a JWT; `GET /auth/logout` — real jti-denylist
       revocation, lazy purge-on-logout keeps the table bounded
-- [ ] `[Authorize]` on TodosController/ItemsController + per-user query scoping
-      (removing client-supplied `CreatedBy`) — next
+- [x] `[Authorize]` on TodosController and ItemsController; every query scoped to
+      the authenticated user's email claim; `CreatedBy` no longer client-supplied
 - [ ] Swagger/OpenAPI polish, httpie verification pass, Portal (Theme 1) — not started
