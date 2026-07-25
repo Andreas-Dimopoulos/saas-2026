@@ -1,0 +1,18 @@
+@model Post
+@{
+    ViewData["Title"] = Model.Title;
+    var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+}
+
+<h1>@Model.Title</h1>
+<p class="text-muted">@Model.Category &middot; by @Model.Author.DisplayName</p>
+
+<p>@Model.Body</p>
+
+@if (Model.AuthorId == currentUserId)
+{
+    <a asp-controller="Posts" asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-secondary">Edit</a>
+    <a asp-controller="Posts" asp-action="Delete" asp-route-id="@Model.Id" class="btn btn-danger">Delete</a>
+}
+
+<p class="mt-3"><a asp-controller="Posts" asp-action="Index">Back to posts</a></p>

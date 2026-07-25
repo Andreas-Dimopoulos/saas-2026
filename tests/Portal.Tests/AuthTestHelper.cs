@@ -32,4 +32,10 @@ public static partial class AuthTestHelper
 
         return client;
     }
+
+    public static async Task<string> GetAntiforgeryTokenAsync(HttpClient client, string url)
+    {
+        var page = await client.GetStringAsync(url);
+        return AntiforgeryTokenPattern().Match(page).Groups[1].Value;
+    }
 }

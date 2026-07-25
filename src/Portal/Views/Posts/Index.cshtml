@@ -1,0 +1,40 @@
+@model IEnumerable<Post>
+@{
+    ViewData["Title"] = "Posts";
+    var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+}
+
+<h1>Posts</h1>
+
+<p>
+    <a asp-controller="Posts" asp-action="Create" class="btn btn-primary">New post</a>
+</p>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Title</th>
+            <th>Category</th>
+            <th>Author</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var post in Model)
+        {
+            <tr>
+                <td><a asp-controller="Posts" asp-action="Details" asp-route-id="@post.Id">@post.Title</a></td>
+                <td>@post.Category</td>
+                <td>@post.Author.DisplayName</td>
+                <td>
+                    @if (post.AuthorId == currentUserId)
+                    {
+                        <a asp-controller="Posts" asp-action="Edit" asp-route-id="@post.Id">Edit</a>
+                        <text> | </text>
+                        <a asp-controller="Posts" asp-action="Delete" asp-route-id="@post.Id">Delete</a>
+                    }
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
