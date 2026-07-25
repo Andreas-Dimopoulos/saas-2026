@@ -38,4 +38,58 @@ public class TodosController(TodoContext context) : ControllerBase
 
         return Ok(todo);
     }
+
+    [HttpPost]
+    public async Task<ActionResult<TodoResponse>> CreateTodo(CreateTodoRequest request)
+    {
+        var now = DateTime.UtcNow;
+        var todo = new Todo
+        {
+            Title = request.Title,
+            CreatedBy = request.CreatedBy,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        context.Todos.Add(todo);
+        await context.SaveChangesAsync();
+
+        var response = new TodoResponse(todo.Id, todo.Title, todo.CreatedBy, todo.CreatedAt, todo.UpdatedAt, []);
+        return CreatedAtAction(nameof(GetTodo), new { id = todo.Id }, response);
+    }
+
+    [HttpPut("{id:int}")]
+    public async Task<ActionResult<TodoResponse>> UpdateTodo(int id, UpdateTodoRequest request)
+    {
+        var todo = await context.Todos.FindAsync(id);
+
+        if (todo is null)
+        {
+            return NotFound();
+        }
+
+        todo.Title = request.Title;
+        todo.CreatedBy = request.CreatedBy;
+        todo.UpdatedAt = DateTime.UtcNow;
+        await context.SaveChangesAsync();
+
+        var response = await context.Todos.Where(t => t.Id == id).Select(ToResponse).FirstAsync();
+        return Ok(response);
+    }
+
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> DeleteTodo(int id)
+    {
+        var todo = await context.Todos.FindAsync(id);
+
+        if (todo is null)
+        {
+            return NotFound();
+        }
+
+        context.Todos.Remove(todo);
+        await context.SaveChangesAsync();
+
+        return NoContent();
+    }
 }

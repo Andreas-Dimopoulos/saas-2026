@@ -44,6 +44,18 @@ public class TodosEndpointTests
     }
 
     [Fact]
+    public async Task PostTodos_ReturnsBadRequestProblemDetails_WhenTitleMissing()
+    {
+        using var factory = new TodoApiFactory();
+        var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/todos", new { createdBy = "alice" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
     public async Task GetTodoById_ReturnsOkWithMatchingTodo()
     {
         using var factory = new TodoApiFactory();
@@ -87,6 +99,31 @@ public class TodosEndpointTests
     }
 
     [Fact]
+    public async Task PutTodoById_ReturnsNotFound_WhenMissing()
+    {
+        using var factory = new TodoApiFactory();
+        var client = factory.CreateClient();
+
+        var response = await client.PutAsJsonAsync("/todos/999", new { title = "Groceries v2", createdBy = "alice" });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task PutTodoById_ReturnsBadRequestProblemDetails_WhenTitleMissing()
+    {
+        using var factory = new TodoApiFactory();
+        var todoId = await SeedTodoAsync(factory, "Groceries", "alice");
+        var client = factory.CreateClient();
+
+        var response = await client.PutAsJsonAsync($"/todos/{todoId}", new { createdBy = "alice" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
     public async Task DeleteTodoById_ReturnsNoContent()
     {
         using var factory = new TodoApiFactory();
@@ -96,6 +133,18 @@ public class TodosEndpointTests
         var response = await client.DeleteAsync($"/todos/{todoId}");
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteTodoById_ReturnsNotFound_WhenMissing()
+    {
+        using var factory = new TodoApiFactory();
+        var client = factory.CreateClient();
+
+        var response = await client.DeleteAsync("/todos/999");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }
 
     [Fact]
