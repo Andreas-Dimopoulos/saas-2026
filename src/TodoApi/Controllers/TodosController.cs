@@ -1,13 +1,16 @@
 using System.Linq.Expressions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TodoApi.Data;
 using TodoApi.Dtos;
+using TodoApi.Extensions;
 using TodoApi.Models;
 
 namespace TodoApi.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("todos")]
 public class TodosController(TodoContext context) : ControllerBase
 {
@@ -22,14 +25,19 @@ public class TodosController(TodoContext context) : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IEnumerable<TodoResponse>>> GetTodos()
     {
-        var todos = await context.Todos.Select(ToResponse).ToListAsync();
+        var email = User.GetEmail();
+        var todos = await context.Todos.Where(t => t.CreatedBy == email).Select(ToResponse).ToListAsync();
         return Ok(todos);
     }
 
     [HttpGet("{id:int}")]
     public async Task<ActionResult<TodoResponse>> GetTodo(int id)
     {
-        var todo = await context.Todos.Where(t => t.Id == id).Select(ToResponse).FirstOrDefaultAsync();
+        var email = User.GetEmail();
+        var todo = await context.Todos
+            .Where(t => t.Id == id && t.CreatedBy == email)
+            .Select(ToResponse)
+            .FirstOrDefaultAsync();
 
         if (todo is null)
         {
@@ -42,11 +50,12 @@ public class TodosController(TodoContext context) : ControllerBase
     [HttpPost]
     public async Task<ActionResult<TodoResponse>> CreateTodo(CreateTodoRequest request)
     {
+        var email = User.GetEmail();
         var now = DateTime.UtcNow;
         var todo = new Todo
         {
             Title = request.Title,
-            CreatedBy = request.CreatedBy,
+            CreatedBy = email,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -61,7 +70,8 @@ public class TodosController(TodoContext context) : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<ActionResult<TodoResponse>> UpdateTodo(int id, UpdateTodoRequest request)
     {
-        var todo = await context.Todos.FindAsync(id);
+        var email = User.GetEmail();
+        var todo = await context.Todos.FirstOrDefaultAsync(t => t.Id == id && t.CreatedBy == email);
 
         if (todo is null)
         {
@@ -69,7 +79,6 @@ public class TodosController(TodoContext context) : ControllerBase
         }
 
         todo.Title = request.Title;
-        todo.CreatedBy = request.CreatedBy;
         todo.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync();
 
@@ -80,7 +89,8 @@ public class TodosController(TodoContext context) : ControllerBase
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> DeleteTodo(int id)
     {
-        var todo = await context.Todos.FindAsync(id);
+        var email = User.GetEmail();
+        var todo = await context.Todos.FirstOrDefaultAsync(t => t.Id == id && t.CreatedBy == email);
 
         if (todo is null)
         {

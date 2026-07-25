@@ -113,9 +113,7 @@ public class AuthEndpointTests
     public async Task Logout_ReturnsNoContent_WhenAuthenticated()
     {
         using var factory = new TodoApiFactory();
-        var client = factory.CreateClient();
-        var token = await SignupAndLoginAsync(client, "alice@example.com", "Sup3rSecret1");
-        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, "alice@example.com");
 
         var response = await client.GetAsync("/auth/logout");
 
@@ -126,22 +124,12 @@ public class AuthEndpointTests
     public async Task Logout_RevokesToken_SoSecondUseReturnsUnauthorized()
     {
         using var factory = new TodoApiFactory();
-        var client = factory.CreateClient();
-        var token = await SignupAndLoginAsync(client, "alice@example.com", "Sup3rSecret1");
-        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, "alice@example.com");
 
         var firstLogout = await client.GetAsync("/auth/logout");
         Assert.Equal(HttpStatusCode.NoContent, firstLogout.StatusCode);
 
         var secondLogout = await client.GetAsync("/auth/logout");
         Assert.Equal(HttpStatusCode.Unauthorized, secondLogout.StatusCode);
-    }
-
-    private static async Task<string> SignupAndLoginAsync(HttpClient client, string email, string password)
-    {
-        await client.PostAsJsonAsync("/signup", new { email, password });
-        var loginResponse = await client.PostAsJsonAsync("/auth/login", new { email, password });
-        var body = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
-        return body.GetProperty("token").GetString()!;
     }
 }

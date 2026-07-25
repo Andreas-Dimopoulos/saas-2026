@@ -10,11 +10,14 @@ namespace TodoApi.Tests;
 
 public class TodosEndpointTests
 {
+    private const string OwnerEmail = "alice@example.com";
+    private const string OtherEmail = "bob@example.com";
+
     [Fact]
     public async Task GetTodos_ReturnsOkWithEmptyArray_WhenNoneExist()
     {
         using var factory = new TodoApiFactory();
-        var client = factory.CreateClient();
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
 
         var response = await client.GetAsync("/todos");
 
@@ -25,12 +28,37 @@ public class TodosEndpointTests
     }
 
     [Fact]
-    public async Task PostTodos_ReturnsCreatedWithLocationAndBody()
+    public async Task GetTodos_OnlyReturnsOwnTodos()
+    {
+        using var factory = new TodoApiFactory();
+        await SeedTodoAsync(factory, "Someone else's todo", OtherEmail);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
+
+        var response = await client.GetAsync("/todos");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var todos = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Empty(todos.EnumerateArray());
+    }
+
+    [Fact]
+    public async Task GetTodos_ReturnsUnauthorized_WithoutToken()
     {
         using var factory = new TodoApiFactory();
         var client = factory.CreateClient();
 
-        var response = await client.PostAsJsonAsync("/todos", new { title = "Buy milk", createdBy = "alice" });
+        var response = await client.GetAsync("/todos");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PostTodos_ReturnsCreatedWithLocationAndBody()
+    {
+        using var factory = new TodoApiFactory();
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
+
+        var response = await client.PostAsJsonAsync("/todos", new { title = "Buy milk" });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         Assert.NotNull(response.Headers.Location);
@@ -38,7 +66,7 @@ public class TodosEndpointTests
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.True(body.GetProperty("id").GetInt32() > 0);
         Assert.Equal("Buy milk", body.GetProperty("title").GetString());
-        Assert.Equal("alice", body.GetProperty("createdBy").GetString());
+        Assert.Equal(OwnerEmail, body.GetProperty("createdBy").GetString());
         Assert.Equal(JsonValueKind.Array, body.GetProperty("items").ValueKind);
         Assert.Empty(body.GetProperty("items").EnumerateArray());
     }
@@ -47,9 +75,9 @@ public class TodosEndpointTests
     public async Task PostTodos_ReturnsBadRequestProblemDetails_WhenTitleMissing()
     {
         using var factory = new TodoApiFactory();
-        var client = factory.CreateClient();
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
 
-        var response = await client.PostAsJsonAsync("/todos", new { createdBy = "alice" });
+        var response = await client.PostAsJsonAsync("/todos", new { });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -59,8 +87,8 @@ public class TodosEndpointTests
     public async Task GetTodoById_ReturnsOkWithMatchingTodo()
     {
         using var factory = new TodoApiFactory();
-        var todoId = await SeedTodoAsync(factory, "Groceries", "alice");
-        var client = factory.CreateClient();
+        var todoId = await SeedTodoAsync(factory, "Groceries", OwnerEmail);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
 
         var response = await client.GetAsync($"/todos/{todoId}");
 
@@ -68,16 +96,29 @@ public class TodosEndpointTests
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(todoId, body.GetProperty("id").GetInt32());
         Assert.Equal("Groceries", body.GetProperty("title").GetString());
-        Assert.Equal("alice", body.GetProperty("createdBy").GetString());
+        Assert.Equal(OwnerEmail, body.GetProperty("createdBy").GetString());
     }
 
     [Fact]
     public async Task GetTodoById_ReturnsNotFound_WhenMissing()
     {
         using var factory = new TodoApiFactory();
-        var client = factory.CreateClient();
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
 
         var response = await client.GetAsync("/todos/999");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task GetTodoById_ReturnsNotFound_WhenOwnedByDifferentUser()
+    {
+        using var factory = new TodoApiFactory();
+        var todoId = await SeedTodoAsync(factory, "Someone else's todo", OtherEmail);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
+
+        var response = await client.GetAsync($"/todos/{todoId}");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -87,10 +128,10 @@ public class TodosEndpointTests
     public async Task PutTodoById_ReturnsOkWithUpdatedTodo()
     {
         using var factory = new TodoApiFactory();
-        var todoId = await SeedTodoAsync(factory, "Groceries", "alice");
-        var client = factory.CreateClient();
+        var todoId = await SeedTodoAsync(factory, "Groceries", OwnerEmail);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
 
-        var response = await client.PutAsJsonAsync($"/todos/{todoId}", new { title = "Groceries v2", createdBy = "alice" });
+        var response = await client.PutAsJsonAsync($"/todos/{todoId}", new { title = "Groceries v2" });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -102,9 +143,22 @@ public class TodosEndpointTests
     public async Task PutTodoById_ReturnsNotFound_WhenMissing()
     {
         using var factory = new TodoApiFactory();
-        var client = factory.CreateClient();
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
 
-        var response = await client.PutAsJsonAsync("/todos/999", new { title = "Groceries v2", createdBy = "alice" });
+        var response = await client.PutAsJsonAsync("/todos/999", new { title = "Groceries v2" });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task PutTodoById_ReturnsNotFound_WhenOwnedByDifferentUser()
+    {
+        using var factory = new TodoApiFactory();
+        var todoId = await SeedTodoAsync(factory, "Someone else's todo", OtherEmail);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
+
+        var response = await client.PutAsJsonAsync($"/todos/{todoId}", new { title = "Hijacked" });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -114,10 +168,10 @@ public class TodosEndpointTests
     public async Task PutTodoById_ReturnsBadRequestProblemDetails_WhenTitleMissing()
     {
         using var factory = new TodoApiFactory();
-        var todoId = await SeedTodoAsync(factory, "Groceries", "alice");
-        var client = factory.CreateClient();
+        var todoId = await SeedTodoAsync(factory, "Groceries", OwnerEmail);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
 
-        var response = await client.PutAsJsonAsync($"/todos/{todoId}", new { createdBy = "alice" });
+        var response = await client.PutAsJsonAsync($"/todos/{todoId}", new { });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -127,8 +181,8 @@ public class TodosEndpointTests
     public async Task DeleteTodoById_ReturnsNoContent()
     {
         using var factory = new TodoApiFactory();
-        var todoId = await SeedTodoAsync(factory, "Groceries", "alice");
-        var client = factory.CreateClient();
+        var todoId = await SeedTodoAsync(factory, "Groceries", OwnerEmail);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
 
         var response = await client.DeleteAsync($"/todos/{todoId}");
 
@@ -139,9 +193,22 @@ public class TodosEndpointTests
     public async Task DeleteTodoById_ReturnsNotFound_WhenMissing()
     {
         using var factory = new TodoApiFactory();
-        var client = factory.CreateClient();
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
 
         var response = await client.DeleteAsync("/todos/999");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task DeleteTodoById_ReturnsNotFound_WhenOwnedByDifferentUser()
+    {
+        using var factory = new TodoApiFactory();
+        var todoId = await SeedTodoAsync(factory, "Someone else's todo", OtherEmail);
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
+
+        var response = await client.DeleteAsync($"/todos/{todoId}");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -159,7 +226,7 @@ public class TodosEndpointTests
             var todo = new Todo
             {
                 Title = "Groceries",
-                CreatedBy = "alice",
+                CreatedBy = OwnerEmail,
                 CreatedAt = now,
                 UpdatedAt = now,
                 Items =
@@ -173,7 +240,7 @@ public class TodosEndpointTests
             todoId = todo.Id;
         }
 
-        var client = factory.CreateClient();
+        var client = await AuthTestHelper.AuthenticatedClientAsync(factory, OwnerEmail);
         var response = await client.DeleteAsync($"/todos/{todoId}");
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
