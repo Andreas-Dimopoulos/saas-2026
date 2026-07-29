@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Portal.Authentication;
 using Portal.Data;
 using Portal.Models;
 
@@ -11,6 +13,14 @@ builder.Services.AddDbContext<PortalContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("PortalContext")));
 builder.Services.AddIdentity<PortalUser, IdentityRole>()
     .AddEntityFrameworkStores<PortalContext>();
+
+// Parameterless AddAuthentication() registers an additional scheme without touching
+// AuthenticationOptions.DefaultScheme/DefaultSignInScheme/DefaultChallengeScheme, which
+// AddIdentity() above already set to the cookie scheme. Calling AddAuthentication("Basic")
+// instead would silently overwrite that default for the whole site.
+builder.Services.AddAuthentication()
+    .AddScheme<AuthenticationSchemeOptions, BasicAuthenticationHandler>(
+        BasicAuthenticationDefaults.AuthenticationScheme, options => { });
 
 var app = builder.Build();
 
