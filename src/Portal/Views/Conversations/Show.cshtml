@@ -30,10 +30,11 @@
 <p class="mt-3"><a asp-controller="Conversations" asp-action="Index">Back to messages</a></p>
 
 @section Scripts {
-    <script src="~/lib/signalr/signalr.min.js"></script>
+    @* signalr.min.js and window.portalCurrentUserId are already loaded by _Layout for
+       every authenticated page (the notification badge needs them too) - only the
+       conversation-specific id is set here. *@
     <script>
         window.portalConversationId = @Model.Id;
-        window.portalCurrentUserId = "@User.FindFirstValue(ClaimTypes.NameIdentifier)";
     </script>
     <script src="~/js/conversation.js" asp-append-version="true"></script>
 }

@@ -4,12 +4,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Portal.Data;
 using Portal.Models;
+using Portal.Services;
 using Portal.ViewModels;
 
 namespace Portal.Controllers;
 
 [Authorize]
-public class ConversationsController(PortalContext context, UserManager<PortalUser> userManager) : Controller
+public class ConversationsController(PortalContext context, UserManager<PortalUser> userManager, NotificationService notifications) : Controller
 {
     public async Task<IActionResult> Index()
     {
@@ -84,11 +85,31 @@ public class ConversationsController(PortalContext context, UserManager<PortalUs
             return null;
         }
 
+        // Opening a conversation is what clears its unread notification - otherwise
+        // the badge only ever grows through normal use. Scoped by ConversationId, so
+        // this only ever touches this conversation's NewMessage notification, never a
+        // NewContact one (which has no ConversationId to match).
+        var unreadNotifications = await context.Notifications
+            .Where(notification => notification.RecipientId == currentUserId
+                && notification.ConversationId == id
+                && !notification.IsRead)
+            .ToListAsync();
+
+        foreach (var notification in unreadNotifications)
+        {
+            notification.IsRead = true;
+        }
+
         var conversation = await context.Conversations
             .Include(conversation => conversation.Participants).ThenInclude(participant => participant.User)
             .Include(conversation => conversation.Messages.OrderBy(message => message.SentAt))
                 .ThenInclude(message => message.Sender)
             .FirstAsync(conversation => conversation.Id == id);
+
+        if (unreadNotifications.Count > 0)
+        {
+            await context.SaveChangesAsync();
+        }
 
         var otherNames = conversation.Participants
             .Where(participant => participant.UserId != currentUserId)
@@ -215,6 +236,12 @@ public class ConversationsController(PortalContext context, UserManager<PortalUs
             SentAt = DateTime.UtcNow
         });
         await context.SaveChangesAsync();
+
+        var sender = await userManager.GetUserAsync(User);
+        if (sender is not null)
+        {
+            await notifications.NotifyNewMessageAsync(id, currentUserId, sender.DisplayName);
+        }
 
         return RedirectToAction(nameof(Show), new { id });
     }

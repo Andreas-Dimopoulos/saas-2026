@@ -3,11 +3,12 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.SignalR;
 using Portal.Data;
 using Portal.Models;
+using Portal.Services;
 
 namespace Portal.Hubs;
 
 [Authorize]
-public class ConversationHub(PortalContext context, UserManager<PortalUser> userManager) : Hub
+public class ConversationHub(PortalContext context, UserManager<PortalUser> userManager, NotificationService notifications) : Hub
 {
     // [Authorize] only proves the caller is signed in - it says nothing about which
     // conversations they may join. Without this check, any authenticated user could
@@ -70,6 +71,8 @@ public class ConversationHub(PortalContext context, UserManager<PortalUser> user
         // see their own message twice.
         await Clients.Group(GroupName(conversationId))
             .SendAsync("ReceiveMessage", sender.DisplayName, userId, message.Body, message.SentAt);
+
+        await notifications.NotifyNewMessageAsync(conversationId, userId, sender.DisplayName);
     }
 
     private static string GroupName(int conversationId) => $"conversation-{conversationId}";

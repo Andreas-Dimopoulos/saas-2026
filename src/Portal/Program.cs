@@ -7,6 +7,7 @@ using Portal.Authentication;
 using Portal.Data;
 using Portal.Hubs;
 using Portal.Models;
+using Portal.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +18,7 @@ builder.Services.AddDbContext<PortalContext>(options =>
 builder.Services.AddIdentity<PortalUser, IdentityRole>()
     .AddEntityFrameworkStores<PortalContext>();
 builder.Services.AddSignalR();
+builder.Services.AddScoped<NotificationService>();
 
 // Parameterless AddAuthentication() registers an additional scheme without touching
 // AuthenticationOptions.DefaultScheme/DefaultSignInScheme/DefaultChallengeScheme, which
@@ -82,6 +84,7 @@ app.UseAuthorization();
 app.MapStaticAssets();
 
 app.MapHub<ConversationHub>("/hubs/conversations");
+app.MapHub<NotificationHub>("/hubs/notifications");
 
 app.MapControllerRoute(
     name: "default",

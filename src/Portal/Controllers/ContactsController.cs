@@ -4,12 +4,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Portal.Data;
 using Portal.Models;
+using Portal.Services;
 using Portal.ViewModels;
 
 namespace Portal.Controllers;
 
 [Authorize]
-public class ContactsController(PortalContext context, UserManager<PortalUser> userManager) : Controller
+public class ContactsController(PortalContext context, UserManager<PortalUser> userManager, NotificationService notifications) : Controller
 {
     public async Task<IActionResult> Index()
     {
@@ -87,6 +88,12 @@ public class ContactsController(PortalContext context, UserManager<PortalUser> u
             CreatedAt = DateTime.UtcNow
         });
         await context.SaveChangesAsync();
+
+        var owner = await userManager.GetUserAsync(User);
+        if (owner is not null)
+        {
+            await notifications.NotifyNewContactAsync(currentUserId, owner.DisplayName, contactUserId);
+        }
 
         return RedirectToAction(nameof(Index));
     }
