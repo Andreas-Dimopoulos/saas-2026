@@ -1,0 +1,44 @@
+@model NewConversationViewModel
+@{
+    ViewData["Title"] = "New conversation";
+}
+
+<h1>New conversation</h1>
+
+@if (TempData["ConversationError"] is string error)
+{
+    <div class="alert alert-danger">@error</div>
+}
+
+<form asp-controller="Conversations" asp-action="New" method="get" class="row g-2 mb-3">
+    <div class="col-auto">
+        <input type="text" name="search" value="@Model.Search" class="form-control" placeholder="Search by name, or exact email" />
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-secondary">Search</button>
+    </div>
+</form>
+
+<form asp-controller="Conversations" asp-action="Create" method="post">
+    <table class="table">
+        <thead>
+            <tr>
+                <th></th>
+                <th>Name</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var user in Model.Results)
+            {
+                <tr>
+                    <td><input type="checkbox" name="participantIds" value="@user.Id" /></td>
+                    <td>@user.DisplayName</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <button type="submit" class="btn btn-primary">Start conversation</button>
+</form>
+
+<p class="mt-3"><a asp-controller="Conversations" asp-action="Index">Back to messages</a></p>

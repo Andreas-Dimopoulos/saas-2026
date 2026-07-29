@@ -1,0 +1,30 @@
+@model IReadOnlyList<ConversationSummaryViewModel>
+@{
+    ViewData["Title"] = "Messages";
+}
+
+<h1>Messages</h1>
+
+<p>
+    <a asp-controller="Conversations" asp-action="New" class="btn btn-primary">New conversation</a>
+</p>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>With</th>
+            <th>Last message</th>
+            <th>When</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var conversation in Model)
+        {
+            <tr>
+                <td><a asp-controller="Conversations" asp-action="Show" asp-route-id="@conversation.Id">@conversation.DisplayTitle</a></td>
+                <td>@conversation.LastMessageBody</td>
+                <td>@conversation.LastMessageAt</td>
+            </tr>
+        }
+    </tbody>
+</table>
