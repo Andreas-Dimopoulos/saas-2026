@@ -94,7 +94,7 @@ Stored outside the repo, under
   A resource that exists but belongs to someone else must be indistinguishable from
   one that doesn't exist at all (404, not 403).
 
-## Gotchas hit in Theme 2 — don't rediscover these
+## Gotchas hit in Theme 2 and Theme 1 — don't rediscover these
 
 - **`[property: Required]` on a record's primary constructor parameter compiles but
   breaks at request time.** MVC's model validation for record types requires the
@@ -119,9 +119,41 @@ Stored outside the repo, under
   because their types already ship in the `Microsoft.AspNetCore.App` shared
   framework. Hit this with `Microsoft.Extensions.Identity.Core` — removed it,
   `PasswordHasher<TUser>` still resolved and all tests still passed. If NuGet warns
-  this, try removing the package before assuming it's needed.
+  this, try removing the package before assuming it's needed. The opposite trap also
+  exists: `SQLitePCLRaw.bundle_e_sqlite3` looked equally redundant under
+  `Microsoft.EntityFrameworkCore.Sqlite`, but removing it let the transitive
+  resolution drop to a version with a known high-severity vulnerability (NU1903) —
+  verify redundancy with `dotnet nuget why` before removing, don't assume from the
+  warning alone.
+- **EF Core's Sqlite provider translates `string.Contains`/`StartsWith`/`EndsWith` to
+  `instr()`, which is case-sensitive** (a deliberate EF Core 5+ change to match
+  .NET's ordinal semantics) — not to SQL `LIKE`, which SQLite treats as
+  case-insensitive for ASCII regardless of column collation. A naive
+  `post.Title.Contains(search)` silently fails a "case-insensitive search"
+  requirement on Sqlite. Use `EF.Functions.Like(post.Title, $"%{search}%")` instead
+  (see `PostsController.Index`).
+- **Registering a remote authentication scheme (anything with a `CallbackPath`, e.g.
+  `AddGoogle`) with an empty `ClientId`/`ClientSecret` breaks every page on the site,
+  not just the feature that uses it.** ASP.NET Core's authentication middleware
+  initializes every such handler on *every* request — not just requests that touch
+  it — to check whether that request is hitting its OAuth callback URL, and
+  `OAuthOptions.Validate()` throws unconditionally on an empty `ClientId`. Only call
+  `.AddGoogle(...)` when both secrets are actually configured (see `Program.cs`); a
+  missing/optional external provider should degrade to "that one button doesn't
+  work," not a site-wide 500.
+- **`dotnet user-secrets` *does* flow into `WebApplicationFactory` test hosts**,
+  because the factory defaults to the `Development` environment and
+  `WebApplication.CreateBuilder` adds the user-secrets configuration source
+  whenever `IsDevelopment()` is true. Verified empirically: temporarily removed the
+  Google secrets from this machine's secret store and reran the full Portal suite —
+  all 12 tests still passed, because none of them exercise the real `AddGoogle`
+  scheme (`ExternalLoginTests` fakes the OAuth round trip via a test-only
+  `IStartupFilter` instead). Worth knowing before writing a test that *does* touch a
+  real external-provider scheme — such a test would silently depend on whatever is
+  in the developer's local secret store, the same class of problem
+  `TodoApiFactory` avoids for the JWT signing key by supplying its own.
 
-## Theme 1 — Portal (`src/Portal`) — not started
+## Theme 1 — Portal (`src/Portal`) — in progress (see Status)
 
 Lab-group collaboration portal. ASP.NET Core MVC (Controllers + Views), chosen over
 Razor Pages because it maps more naturally onto distinct "services" (posts, contacts,
@@ -218,5 +250,31 @@ Theme 2 (TodoApi) — complete:
       exercised for real, including the revoked-token 401)
 - [x] All 49 tests passing, no known package vulnerabilities
 
-Theme 1 (Portal) — not started:
-- [ ] Everything (see "Theme 1 — Portal" above)
+Theme 1 (Portal) — in progress:
+- [x] ASP.NET Core Identity: `PortalUser : IdentityUser` + `DisplayName`, `PortalContext
+      : IdentityDbContext<PortalUser>` on its own SQLite database (`portal.db`,
+      separate from `todos.db`); hand-written (not scaffolded) `AccountController`
+      with Register/Login/Logout
+- [x] Posts: `Post` entity with a real FK to `PortalUser` (not an email string, unlike
+      `Todo.CreatedBy`); CRUD via `PostsController`; edit/delete scoped to the author
+      via the same 404-not-403 convention as TodoApi; case-insensitive search
+      (`EF.Functions.Like`, not `string.Contains` — see Gotchas) plus category filter
+      (`PostCategory` enum via `HasConversion<string>()`) composed onto one
+      `IQueryable` before a single `ToListAsync`
+- [x] HTTP Basic authentication: custom `AuthenticationHandler<AuthenticationSchemeOptions>`
+      registered as an *additional* scheme via the parameterless `AddAuthentication()`
+      overload (never the default), validated against `UserManager.CheckPasswordAsync`,
+      demoed on `GET /api/me`
+- [x] Google external login: `AddGoogle`, registered only when both
+      `Authentication:Google:ClientId`/`ClientSecret` are configured (registering it
+      unconditionally 500s the whole site when they're absent — see Gotchas); rejects
+      rather than auto-links on an email match with an existing local account (see
+      "Deliberate non-goal" above), and rejects a missing or unverified email claim
+- [x] All 12 Portal tests passing (61 total across both themes); verified independent
+      of local `dotnet user-secrets` state by temporarily removing the Google secrets
+      and confirming the full Portal suite still passes
+
+Not yet built:
+- [ ] Contacts (adding other users)
+- [ ] Direct messages (popup window, 1-to-1 and group)
+- [ ] Live notifications
