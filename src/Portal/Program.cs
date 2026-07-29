@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Portal.Authentication;
 using Portal.Data;
+using Portal.Hubs;
 using Portal.Models;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,6 +16,7 @@ builder.Services.AddDbContext<PortalContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("PortalContext")));
 builder.Services.AddIdentity<PortalUser, IdentityRole>()
     .AddEntityFrameworkStores<PortalContext>();
+builder.Services.AddSignalR();
 
 // Parameterless AddAuthentication() registers an additional scheme without touching
 // AuthenticationOptions.DefaultScheme/DefaultSignInScheme/DefaultChallengeScheme, which
@@ -78,6 +80,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapStaticAssets();
+
+app.MapHub<ChatHub>("/hubs/chat");
 
 app.MapControllerRoute(
     name: "default",

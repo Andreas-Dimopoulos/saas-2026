@@ -1,0 +1,55 @@
+@{
+    ViewData["Title"] = "Chat spike";
+}
+
+<h1>Chat spike</h1>
+<p>
+    Signed in as <strong>@User.Identity!.Name</strong>. Open this page in a second
+    browser tab (or a separate signed-in browser profile) and send a message here -
+    it should appear in the other tab without a page refresh.
+</p>
+
+<div id="status" class="mb-2 text-muted">Connecting&hellip;</div>
+
+<div class="input-group mb-3" style="max-width: 500px;">
+    <input type="text" id="messageInput" class="form-control" placeholder="Type a message" />
+    <button class="btn btn-primary" id="sendButton" type="button">Send</button>
+</div>
+
+<ul id="messageLog" class="list-group" style="max-width: 500px;"></ul>
+
+@section Scripts {
+    <script src="~/lib/signalr/signalr.min.js"></script>
+    <script>
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl("/hubs/chat")
+            .withAutomaticReconnect()
+            .build();
+
+        const statusEl = document.getElementById("status");
+        const log = document.getElementById("messageLog");
+
+        function appendMessage(from, text) {
+            const li = document.createElement("li");
+            li.className = "list-group-item";
+            li.textContent = `${from}: ${text}`;
+            log.appendChild(li);
+        }
+
+        connection.on("ReceiveMessage", appendMessage);
+
+        connection.start()
+            .then(() => { statusEl.textContent = "Connected."; })
+            .catch(err => {
+                statusEl.textContent = "Connection failed - see console.";
+                console.error(err);
+            });
+
+        document.getElementById("sendButton").addEventListener("click", () => {
+            const input = document.getElementById("messageInput");
+            if (!input.value) return;
+            connection.invoke("SendMessage", input.value).catch(err => console.error(err));
+            input.value = "";
+        });
+    </script>
+}

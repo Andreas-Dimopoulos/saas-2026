@@ -232,9 +232,19 @@ row; `ContactsControllerTests` proves the friendly-message paths.
 - **Ask before adding any NuGet package.** State what the package does and why it's
   needed. This includes transitive dependencies that need pinning (e.g. security
   patches) — confirm the exact version before editing a `.csproj`.
-- **TDD, no exceptions.** Write the failing test first, run it, watch it fail for the
-  expected reason, then write the minimum implementation to pass it. Never write
-  implementation code before its test exists.
+- **TDD, scoped by theme.** Theme 2 (`TodoApi`) was built with strict test-first
+  discipline throughout and is now frozen — that discipline doesn't need repeating
+  there. Theme 1 (`Portal`) uses scoped testing instead: write tests only where
+  they're cheap and catch a real bug — authorization, ownership/tenant scoping,
+  database constraints (see the dual-enforcement pattern under "Personal contacts"
+  above). Do **not** write tests for rendered views, OAuth flows, or SignalR hubs —
+  those are verified manually (OAuth already has one exception in place, a fake
+  external-login test filter; don't add more). Real-time/SignalR behavior is
+  verified by hand with two browser profiles, not by driving a hub through
+  `WebApplicationFactory` — that harness is expensive to get working for hubs and
+  buys little over just watching two tabs talk to each other. When a test is worth
+  writing at all, still write it first and watch it fail for the expected reason
+  before implementing.
 - **Flag uncertainty about .NET 10 APIs explicitly.** Patterns changed between .NET 8
   and .NET 10 (e.g. built-in OpenAPI document generation, identity APIs). If unsure
   whether something is current, say so rather than guessing, and check docs/verify
