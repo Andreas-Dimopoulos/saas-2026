@@ -143,6 +143,33 @@ Planned features (not yet built — add one at a time):
 - Direct messages in a popup window (1-to-1 and group)
 - Live notifications
 
+### Deliberate non-goal: auto-linking external logins to existing local accounts
+
+`AccountController.ExternalLoginCallback` **rejects** a Google sign-in when the
+Google account's email matches an existing local (password) account, rather than
+linking the two. This was a considered decision, not an omission — see commit
+`feat(portal): add Google external login`.
+
+**Why reject:** local registration in this app never verifies email ownership (no
+`RequireConfirmedEmail`, no confirmation email sent). Auto-linking on email match
+would let an attacker pre-register a victim's real email locally, then have the
+victim's later, genuinely Google-verified sign-in silently absorbed into the account
+the attacker already controls via the local password. Gating on Google's own
+`email_verified` claim doesn't fix this — it only verifies the Google side; the hole
+is entirely on the unverified local side.
+
+**The correct shape, if linking is ever wanted:** initiate it from an
+*already-authenticated* session — a "connect your Google account" action available
+only to a user already signed in with their password, so ownership of the local
+account is proven before any external identity is attached to it. Never link
+implicitly during an anonymous login attempt.
+
+**Prerequisite before auto-linking-during-login could be safe:** local email
+confirmation (`RequireConfirmedEmail` plus a real confirmation-email flow), so the
+local account's `Email` field carries the same verification confidence as Google's.
+Without that, "the emails match" isn't a trustworthy signal no matter how tightly the
+external side is gated.
+
 ## Working conventions (how to collaborate on this repo)
 
 - **Small increments only.** Finish one thing, stop, explain what was built and why,
