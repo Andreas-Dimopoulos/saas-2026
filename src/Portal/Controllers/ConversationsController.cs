@@ -58,16 +58,30 @@ public class ConversationsController(PortalContext context, UserManager<PortalUs
     public async Task<IActionResult> Show(int id)
     {
         var currentUserId = userManager.GetUserId(User)!;
+        var model = await LoadConversationDetailAsync(id, currentUserId);
 
+        return model is null ? NotFound() : View(model);
+    }
+
+    // Full page and popup render the exact same conversation the exact same way - no
+    // special-casing one surface over the other, since both join the same SignalR
+    // group and both must show identical history on a plain page load.
+    public async Task<IActionResult> Popup(int id)
+    {
+        var currentUserId = userManager.GetUserId(User)!;
+        var model = await LoadConversationDetailAsync(id, currentUserId);
+
+        return model is null ? NotFound() : View(model);
+    }
+
+    private async Task<ConversationDetailViewModel?> LoadConversationDetailAsync(int id, string currentUserId)
+    {
         // Membership check first, as its own query - a non-participant never causes
         // the conversation's (private) messages to be loaded into memory at all, and
         // gets exactly the same 404 as an id that doesn't exist.
-        var isParticipant = await context.ConversationParticipants
-            .AnyAsync(participant => participant.ConversationId == id && participant.UserId == currentUserId);
-
-        if (!isParticipant)
+        if (!await context.IsParticipantAsync(id, currentUserId))
         {
-            return NotFound();
+            return null;
         }
 
         var conversation = await context.Conversations
@@ -91,13 +105,13 @@ public class ConversationsController(PortalContext context, UserManager<PortalUs
             })
             .ToList();
 
-        return View(new ConversationDetailViewModel
+        return new ConversationDetailViewModel
         {
             Id = conversation.Id,
             Name = conversation.Name,
             OtherParticipantNames = otherNames,
             Messages = messages
-        });
+        };
     }
 
     public async Task<IActionResult> New(string? search)
@@ -183,10 +197,7 @@ public class ConversationsController(PortalContext context, UserManager<PortalUs
     {
         var currentUserId = userManager.GetUserId(User)!;
 
-        var isParticipant = await context.ConversationParticipants
-            .AnyAsync(participant => participant.ConversationId == id && participant.UserId == currentUserId);
-
-        if (!isParticipant)
+        if (!await context.IsParticipantAsync(id, currentUserId))
         {
             return NotFound();
         }

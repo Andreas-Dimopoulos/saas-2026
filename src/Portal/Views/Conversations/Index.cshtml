@@ -15,6 +15,7 @@
             <th>With</th>
             <th>Last message</th>
             <th>When</th>
+            <th></th>
         </tr>
     </thead>
     <tbody>
@@ -24,7 +25,34 @@
                 <td><a asp-controller="Conversations" asp-action="Show" asp-route-id="@conversation.Id">@conversation.DisplayTitle</a></td>
                 <td>@conversation.LastMessageBody</td>
                 <td>@conversation.LastMessageAt</td>
+                <td>
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                            onclick="openConversationPopup(@conversation.Id)">Popup</button>
+                </td>
             </tr>
         }
     </tbody>
 </table>
+
+@section Scripts {
+    <script>
+        // Named conv-{id} so a second click on the same conversation reuses the
+        // existing window instead of spawning another; a different id gets a
+        // different name, so it opens its own separate popup.
+        function openConversationPopup(conversationId) {
+            const url = `/Conversations/Popup/${conversationId}`;
+            const features = "width=380,height=560,resizable=yes,scrollbars=yes";
+            const popup = window.open(url, `conv-${conversationId}`, features);
+
+            if (!popup) {
+                // Blocked despite being triggered directly by a click - an extension
+                // or a hardened browser setting can still do this. Fall back to a
+                // normal new tab rather than failing silently.
+                window.open(url, "_blank");
+                return;
+            }
+
+            popup.focus();
+        }
+    </script>
+}
