@@ -25,6 +25,13 @@
             </div>
             <button type="submit" class="btn btn-primary">Log in</button>
         </form>
+
+        <hr />
+
+        <form asp-controller="Account" asp-action="ExternalLogin" asp-route-returnUrl="@Context.Request.Query["returnUrl"]" method="post">
+            <input type="hidden" name="provider" value="Google" />
+            <button type="submit" class="btn btn-outline-secondary">Sign in with Google</button>
+        </form>
     </div>
 </div>
 

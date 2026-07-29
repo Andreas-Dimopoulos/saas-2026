@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -24,6 +25,7 @@ public sealed class PortalFactory : WebApplicationFactory<Program>
             services.Remove(descriptor);
 
             services.AddDbContext<PortalContext>(options => options.UseSqlite(Connection));
+            services.AddSingleton<IStartupFilter, FakeExternalLoginStartupFilter>();
 
             using var scope = services.BuildServiceProvider().CreateScope();
             scope.ServiceProvider.GetRequiredService<PortalContext>().Database.EnsureCreated();
