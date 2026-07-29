@@ -163,13 +163,21 @@ conversation (`Conversations/New` → `Conversations/Create`), send a message ov
 plain HTTP (`Conversations/SendMessage`) and see it persisted on reload, and
 authenticate via HTTP Basic (`GET /api/me` with `-u email:password`) → 200.
 
-**Running both apps at the same time:** their `launchSettings.json` `https` profiles
-collide — both TodoApi's and Portal's `https` profile bind `https://localhost:7292`
-*and* `http://localhost:5245`. Run TodoApi with its default `http` profile
-(`dotnet run`, no flag — port 5245 only) alongside Portal's `https` profile
-(`dotnet run --launch-profile https` — ports 7292/5036) if you need both running
-simultaneously; running both with `--launch-profile https` fails with an
-address-already-in-use error.
+**Running both apps at the same time:** this is expected to work, and does — demoing
+both halves of the assignment side by side is exactly what an oral exam calls for.
+TodoApi's `https` profile is `https://localhost:7292` / `http://localhost:5245`;
+Portal's is `https://localhost:7136` / `http://localhost:5136` — no shared ports.
+(TodoApi's ports were left untouched deliberately: `docs/httpie-verification.md` and
+`docs/openapi.json` are frozen Theme 2 artifacts that already reference
+`https://localhost:7292` by name, so Portal's ports were moved instead.) Verified by
+running both with `dotnet run --launch-profile https` in separate terminals at the
+same time: TodoApi's `/swagger/index.html` and Portal's `/` both answered 200
+concurrently, no address-already-in-use error.
+
+If you've configured real Google OAuth credentials for local testing, note that
+Google's authorized redirect URI is tied to the exact origin
+(`https://localhost:7136/signin-google` now, not `:7292`) — update it in the Google
+Cloud Console project if Portal's port ever changes again.
 
 ## Summary of gaps found in existing docs
 
@@ -178,7 +186,8 @@ address-already-in-use error.
 - User-secrets being keyed machine-wide by `UserSecretsId`, not per-clone, wasn't
   called out anywhere and is easy to misread as "per-repo-copy" the first time you hit
   it on a machine that already has any clone of this repo.
-- Running both apps' `https` launch profiles simultaneously collides on ports; wasn't
-  documented anywhere.
+- Running both apps' `https` launch profiles used to collide on ports (both wanted
+  7292/5245) — fixed, not just documented: Portal now runs on 7136/5136 (see
+  `fix: give TodoApi and Portal distinct launch ports`).
 - The Google-login-absent path 500'd on a direct button click before this pass (fixed
   during this verification, not merely documented as a known gap).
