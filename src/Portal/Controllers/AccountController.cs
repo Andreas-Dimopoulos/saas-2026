@@ -87,8 +87,19 @@ public class AccountController(UserManager<PortalUser> userManager, SignInManage
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult ExternalLogin(string provider, string? returnUrl = null)
+    public async Task<IActionResult> ExternalLogin(string provider, string? returnUrl = null)
     {
+        // The POST is reachable directly regardless of what the Login view renders, so
+        // this can't just trust the view hid the button correctly - it has to check
+        // independently. Challenge()-ing an unregistered scheme throws
+        // InvalidOperationException (an unhandled 500), not a clean failure.
+        var schemes = await signInManager.GetExternalAuthenticationSchemesAsync();
+        if (!schemes.Any(scheme => scheme.Name == provider))
+        {
+            ModelState.AddModelError(string.Empty, "That sign-in provider isn't available.");
+            return View(nameof(Login), new LoginViewModel());
+        }
+
         var redirectUrl = Url.Action(nameof(ExternalLoginCallback), "Account", new { returnUrl });
         var properties = signInManager.ConfigureExternalAuthenticationProperties(provider, redirectUrl);
         return Challenge(properties, provider);

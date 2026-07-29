@@ -1,6 +1,12 @@
+@using Microsoft.AspNetCore.Identity
 @model LoginViewModel
+@inject SignInManager<PortalUser> SignInManager
 @{
     ViewData["Title"] = "Log in";
+    // Schemes actually registered in Program.cs, not configuration read directly here -
+    // if AddGoogle is ever conditionally skipped (missing secrets) or another provider
+    // is added, this list can't disagree with what's really wired up.
+    var externalSchemes = await SignInManager.GetExternalAuthenticationSchemesAsync();
 }
 
 <h1>Log in</h1>
@@ -26,12 +32,18 @@
             <button type="submit" class="btn btn-primary">Log in</button>
         </form>
 
-        <hr />
+        @if (externalSchemes.Any())
+        {
+            <hr />
 
-        <form asp-controller="Account" asp-action="ExternalLogin" asp-route-returnUrl="@Context.Request.Query["returnUrl"]" method="post">
-            <input type="hidden" name="provider" value="Google" />
-            <button type="submit" class="btn btn-outline-secondary">Sign in with Google</button>
-        </form>
+            @foreach (var scheme in externalSchemes)
+            {
+                <form asp-controller="Account" asp-action="ExternalLogin" asp-route-returnUrl="@Context.Request.Query["returnUrl"]" method="post">
+                    <input type="hidden" name="provider" value="@scheme.Name" />
+                    <button type="submit" class="btn btn-outline-secondary">Sign in with @scheme.DisplayName</button>
+                </form>
+            }
+        }
     </div>
 </div>
 
