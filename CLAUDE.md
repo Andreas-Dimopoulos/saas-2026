@@ -153,7 +153,7 @@ Stored outside the repo, under
   in the developer's local secret store, the same class of problem
   `TodoApiFactory` avoids for the JWT signing key by supplying its own.
 
-## Theme 1 — Portal (`src/Portal`) — in progress (see Status)
+## Theme 1 — Portal (`src/Portal`) — COMPLETE (see Status)
 
 Lab-group collaboration portal. ASP.NET Core MVC (Controllers + Views), chosen over
 Razor Pages because it maps more naturally onto distinct "services" (posts, contacts,
@@ -166,7 +166,7 @@ approaches at the oral exam. The Identity UI is to be **hand-written, not scaffo
 (no `dotnet aspnet-codegenerator identity`): the student needs to be able to explain
 every Razor page and controller action, not just accept generated boilerplate.
 
-Planned features (not yet built — add one at a time):
+All seven assignment features are built (see Status for detail):
 - Posts with search and categories, across multiple users
 - Adding other users as personal contacts
 - Local (username/password) authentication — full Identity + cookies
@@ -282,7 +282,7 @@ Theme 2 (TodoApi) — complete:
       exercised for real, including the revoked-token 401)
 - [x] All 49 tests passing, no known package vulnerabilities
 
-Theme 1 (Portal) — in progress:
+Theme 1 (Portal) — complete:
 - [x] ASP.NET Core Identity: `PortalUser : IdentityUser` + `DisplayName`, `PortalContext
       : IdentityDbContext<PortalUser>` on its own SQLite database (`portal.db`,
       separate from `todos.db`); hand-written (not scaffolded) `AccountController`
@@ -308,8 +308,35 @@ Theme 1 (Portal) — in progress:
       message (see "Personal contacts" above); browse/search results expose
       `DisplayName` only (own view model, not the `PortalUser` entity), with email
       matched exact-only
-- [x] All 17 Portal tests passing (66 total across both themes)
-
-Not yet built:
-- [ ] Direct messages (popup window, 1-to-1 and group)
-- [ ] Live notifications
+- [x] Direct messages: unified `Conversation` entity (a 1-to-1 is just a conversation
+      with two participants, not a separate type) with `ConversationParticipant`
+      (unique index on `(ConversationId, UserId)`, no duplicate participants) and
+      `Message` (Cascade on `ConversationId`, Restrict on `SenderId`/participant
+      `UserId` — no user-deletion feature yet, so a deletion should fail loudly rather
+      than silently erase someone else's visible history); works over plain HTTP
+      first (`ConversationsController`), with `ConversationHub` (SignalR) layered on
+      top as an additive, not load-bearing, live channel — every hub method
+      independently re-checks participant membership via the shared
+      `ConversationAccess.IsParticipantAsync`, since `[Authorize]` only proves who's
+      connected, not what they may read (verified by deliberately removing the check
+      and confirming a non-participant received a private message live, then
+      restoring it). Popup is a real `window.open()` (not a docked panel), named
+      `conv-{id}` so the same conversation reuses one window, with a plain-new-tab
+      fallback when the browser blocks it anyway; clients render only from the
+      hub's broadcast, never by optimistically appending on submit, so the sender
+      never sees their own message twice
+- [x] Live notifications: `Clients.User(userId)` on a separate, deliberately empty
+      `NotificationHub` (no client-invokable methods at all, so — unlike
+      `ConversationHub` — there's no caller-supplied id and thus no cross-tenant
+      surface to guard in the first place) fans out to every connection a user has
+      open (tabs, popup) via the default `IUserIdProvider`. Two triggers only — a new
+      message in a conversation you're in, and being added as a contact — each
+      persisted as a `Notification` (`Cascade` on `RecipientId`/`ConversationId`,
+      `SetNull` on the nullable `ActorId` — deliberately different from every other
+      user-facing FK in this app, since a notification has exactly one reader, not a
+      second party whose data needs protecting); message notifications collapse to
+      one unread row per conversation while unread, updated in place, so several
+      messages in a demo don't inflate the badge; opening a conversation marks its
+      notification read. Composite index on `(RecipientId, IsRead)` for the one query
+      that runs on every page load (the nav badge)
+- [x] All 22 Portal tests passing (71 total across both themes)
