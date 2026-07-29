@@ -1,0 +1,45 @@
+@model BrowseUsersViewModel
+@{
+    ViewData["Title"] = "Add a contact";
+}
+
+<h1>Add a contact</h1>
+
+@if (TempData["ContactError"] is string error)
+{
+    <div class="alert alert-danger">@error</div>
+}
+
+<form asp-controller="Contacts" asp-action="Browse" method="get" class="row g-2 mb-3">
+    <div class="col-auto">
+        <input type="text" name="search" value="@Model.Search" class="form-control" placeholder="Search by name, or exact email" />
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-secondary">Search</button>
+    </div>
+</form>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var user in Model.Results)
+        {
+            <tr>
+                <td>@user.DisplayName</td>
+                <td>
+                    <form asp-controller="Contacts" asp-action="Add" method="post">
+                        <input type="hidden" name="contactUserId" value="@user.Id" />
+                        <button type="submit" class="btn btn-sm btn-primary">Add</button>
+                    </form>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<p><a asp-controller="Contacts" asp-action="Index">Back to my contacts</a></p>
