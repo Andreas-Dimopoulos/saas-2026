@@ -202,6 +202,28 @@ local account's `Email` field carries the same verification confidence as Google
 Without that, "the emails match" isn't a trustworthy signal no matter how tightly the
 external side is gated.
 
+### Personal contacts: directional, DisplayName-only, dual enforcement
+
+Contacts are **directional** (I add you, you don't automatically have me) — matches
+the assignment's own one-directional phrasing ("προσωπικές επαφές" / "add other users
+as contacts"), and the described behaviour has no request/accept step anywhere in it.
+
+Browsing to add a contact never renders another user's email. Results use
+`UserSearchResultViewModel` (`Id`/`DisplayName` only), not the `PortalUser` entity, so
+email is structurally absent rather than just conventionally omitted. Search matches
+`DisplayName` by partial, case-insensitive substring, and email by **exact match
+only** (against `NormalizedEmail`) — findability for someone who already knows the
+address, without turning the page into an enumerable directory.
+
+The no-self-contact and no-duplicate-pair rules are each enforced twice, on purpose:
+a SQLite `CHECK` constraint and a composite unique index on `(OwnerId,
+ContactUserId)` are the guarantee — they're what actually closes the race between two
+concurrent adds. Matching checks in `ContactsController.Add` are for the message — a
+readable "already in your contacts" instead of a raw constraint-violation 500.
+Verified as two separate claims: `ContactConstraintTests` inserts straight through
+`PortalContext`, bypassing the controller, to prove the database itself rejects the
+row; `ContactsControllerTests` proves the friendly-message paths.
+
 ## Working conventions (how to collaborate on this repo)
 
 - **Small increments only.** Finish one thing, stop, explain what was built and why,
@@ -270,11 +292,14 @@ Theme 1 (Portal) — in progress:
       unconditionally 500s the whole site when they're absent — see Gotchas); rejects
       rather than auto-links on an email match with an existing local account (see
       "Deliberate non-goal" above), and rejects a missing or unverified email claim
-- [x] All 12 Portal tests passing (61 total across both themes); verified independent
-      of local `dotnet user-secrets` state by temporarily removing the Google secrets
-      and confirming the full Portal suite still passes
+- [x] Personal contacts: `Contact` join entity, directional, with a database CHECK
+      constraint (no self-contact) and a composite unique index (no duplicate pairs)
+      as the guarantee, plus matching `ContactsController` checks for a readable
+      message (see "Personal contacts" above); browse/search results expose
+      `DisplayName` only (own view model, not the `PortalUser` entity), with email
+      matched exact-only
+- [x] All 17 Portal tests passing (66 total across both themes)
 
 Not yet built:
-- [ ] Contacts (adding other users)
 - [ ] Direct messages (popup window, 1-to-1 and group)
 - [ ] Live notifications
